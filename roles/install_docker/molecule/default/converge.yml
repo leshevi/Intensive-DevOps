@@ -1,0 +1,13 @@
+---
+- name: Converge
+  hosts: all
+  gather_facts: false
+  pre_tasks:
+    - name: Converge | pre_tasks install python
+      ansible.builtin.raw: test -e /usr/bin/python3 || (apt-get update && apt-get install -y python3-pip)
+      register: python_out
+      changed_when: python_out.rc != 0
+  tasks:
+    - name: Include ansible.install_docker
+      ansible.builtin.include_role:
+        name: ansible.install_docker
