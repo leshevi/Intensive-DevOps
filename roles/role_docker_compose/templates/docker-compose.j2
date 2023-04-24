@@ -1,0 +1,98 @@
+version: '3.9'
+
+volumes:
+  vhost:
+  html:
+  certs:
+  conf:
+  dhparam:
+  acme:
+
+networks:
+  student:
+    name: student
+    driver: bridge
+
+services:
+  mariadb:
+    image: mariadb
+    networks:
+      - student
+    env_file:
+      - .env
+    environment:
+      MARIADB_ROOT_PASSWORD: $DB_ROOT_PASSWORD
+      MARIADB_DATABASE: $DB_DATABASE
+      MARIADB_USER: $DB_USER
+      MARIADB_PASSWORD: $DB_PASS
+
+  backend:
+    image: leshevi1/intensive:backend
+    networks:
+      - student
+    env_file:
+      - .env
+    environment:
+      - VIRTUAL_HOST=${VH_BACK}
+      - VIRTUAL_PORT=8080
+      - CERT_NAME=${VH_BACK}
+      - LETSENCRYPT_HOST=${VH_BACK}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - >
+        CATALINA_OPTS=
+          -Dspring.jpa.hibernate.ddl-auto=update
+          -Dspring.datasource.url='jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_DATABASE}
+          -Dspring.datasource.username=${DB_USER}
+          -Dspring.datasource.password=${DB_PASS}
+          -Dspring.jpa.properties.hibernate.dialect=com.mysql.cj.jdbc.Driver
+    depends_on:
+      - mariadb
+    restart: always
+#    ports:
+#      - 8080:8080
+
+  frontend:
+    image: leshevi1/intensive:frontend
+    networks:
+      - student
+    env_file:
+      - .env
+    environment:
+      - VIRTUAL_HOST=${VH_FRONT}
+      - VIRTUAL_PORT=3000
+      - CERT_NAME=${VH_FRONT}
+      - LETSENCRYPT_HOST=${VH_FRONT}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    depends_on:
+      - mariadb
+      - backend
+    restart: always
+  #    ports:
+  #      - 3000:3000
+
+  nginx-proxy:
+    container_name: 'nginx-proxy'
+    image: 'nginxproxy/nginx-proxy'
+    networks:
+      student:
+    ports:
+      - 80:80/tcp
+      - 443:443/tcp
+    volumes:
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs
+      - conf:/etc/nginx/conf.d
+      - dhparam:/etc/nginx/dhparam
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+
+  lets-encrypt:
+    image: 'nginxproxy/acme-companion'
+    networks:
+      student:
+    volumes_from:
+      - nginx-proxy
+    volumes:
+      - certs:/etc/nginx/certs:rw
+      - acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro

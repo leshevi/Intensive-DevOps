@@ -1,0 +1,12 @@
+---
+- name: Playbook | docker
+  hosts: docker
+  become: true
+  roles:
+    - role_docker
+
+- name: Playbook | compose
+  hosts: web
+  become: true
+  roles:
+    - role_docker_compose
